@@ -90,8 +90,6 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnShop.setOnClickListener { showShopDialog() }
         binding.btnSkins.setOnClickListener { showSkinsDialog() }
-
-        // Nuevos botones claros
         binding.btnBackground.setOnClickListener { showBackgroundOptions() }
         binding.btnMusic.setOnClickListener { showMusicOptions() }
         binding.btnSettings.setOnClickListener { showSettingsDialog() }
@@ -149,27 +147,45 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showSkinsDialog() {
-        val options = arrayOf(
-            "Cyan Clásico (gratis)",
-            "Magenta Neon - 500 monedas",
-            "Verde Lima - 800 monedas",
-            "Dorado Legendario - 2000 monedas",
-            "Arcoíris (Premium)"
-        )
+        val skins = SkinManager.SKINS
+        val options = skins.map { skin ->
+            val status = when {
+                SkinManager.getSelectedSkinId(this) == skin.id -> "✓ EQUIPADA"
+                SkinManager.isSkinUnlocked(this, skin) -> "Desbloqueada"
+                skin.requiresPremium -> "Premium"
+                else -> "${skin.price} monedas"
+            }
+            "${skin.name} ($status)"
+        }.toTypedArray()
+
         AlertDialog.Builder(this)
             .setTitle("🎨 Skins")
-            .setItems(options) { _, _ ->
-                Toast.makeText(this, "Skin seleccionada (próximamente se aplicará)", Toast.LENGTH_SHORT).show()
+            .setItems(options) { _, which ->
+                val skin = skins[which]
+                if (SkinManager.isSkinUnlocked(this, skin)) {
+                    SkinManager.setSelectedSkin(this, skin.id)
+                    Toast.makeText(this, "${skin.name} equipada", Toast.LENGTH_SHORT).show()
+                } else if (skin.requiresPremium) {
+                    Toast.makeText(this, "Necesitas Premium para esta skin", Toast.LENGTH_SHORT).show()
+                } else {
+                    val coins = prefs.getInt("coins", 0)
+                    if (coins >= skin.price) {
+                        prefs.edit().putInt("coins", coins - skin.price).apply()
+                        SkinManager.unlockSkin(this, skin.id)
+                        SkinManager.setSelectedSkin(this, skin.id)
+                        updateUI()
+                        Toast.makeText(this, "¡${skin.name} desbloqueada y equipada!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "No tienes suficientes monedas", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
             .setNegativeButton("Cerrar", null)
             .show()
     }
 
     private fun showBackgroundOptions() {
-        val options = arrayOf(
-            "Fondos predefinidos",
-            "Elegir mi propia imagen"
-        )
+        val options = arrayOf("Fondos predefinidos", "Elegir mi propia imagen")
         AlertDialog.Builder(this)
             .setTitle("Personalizar Fondo")
             .setItems(options) { _, which ->
@@ -206,7 +222,7 @@ class MainActivity : AppCompatActivity() {
     private fun showSettingsDialog() {
         val options = arrayOf(
             "Restablecer récord",
-            "Restablecer monedas (solo prueba)",
+            "Añadir monedas de prueba",
             "Acerca del juego"
         )
         AlertDialog.Builder(this)
@@ -219,14 +235,14 @@ class MainActivity : AppCompatActivity() {
                         Toast.makeText(this, "Récord restablecido", Toast.LENGTH_SHORT).show()
                     }
                     1 -> {
-                        prefs.edit().putInt("coins", 1000).apply()
+                        prefs.edit().putInt("coins", 3000).apply()
                         updateUI()
-                        Toast.makeText(this, "Monedas de prueba añadidas", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "+3000 monedas de prueba", Toast.LENGTH_SHORT).show()
                     }
                     2 -> {
                         AlertDialog.Builder(this)
                             .setTitle("Neon Hop")
-                            .setMessage("Versión 1.0\nJuego hyper-casual\nHecho para Play Store")
+                            .setMessage("Versión 1.0\nJuego hyper-casual\nListo para Play Store")
                             .setPositiveButton("Ok", null)
                             .show()
                     }
