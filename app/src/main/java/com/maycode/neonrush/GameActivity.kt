@@ -17,6 +17,7 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
     private lateinit var prefs: SharedPreferences
     private lateinit var adManager: AdManager
     private lateinit var personalization: PersonalizationManager
+    private lateinit var soundManager: SoundManager
 
     private var canRevive = true
     private val REVIVE_COST = 150
@@ -28,12 +29,14 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
 
         prefs = getSharedPreferences("neon_rush_prefs", MODE_PRIVATE)
         personalization = PersonalizationManager(this)
+        soundManager = SoundManager(this)
         adManager = AdManager(this)
         adManager.loadInterstitial()
         adManager.loadRewarded()
 
         gameView = GameView(this)
         gameView.listener = this
+        gameView.soundManager = soundManager
 
         val container = binding.root as FrameLayout
         container.addView(
@@ -134,7 +137,7 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
     override fun onResume() {
         super.onResume()
         if (::gameView.isInitialized) gameView.resume()
-        personalization.startMusic() // Música también durante la partida
+        personalization.startMusic()
     }
 
     override fun onDestroy() {
@@ -142,6 +145,7 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
             gameView.listener = null
             gameView.stop()
         }
+        if (::soundManager.isInitialized) soundManager.release()
         personalization.release()
         if (::adManager.isInitialized) adManager.destroy()
         super.onDestroy()
