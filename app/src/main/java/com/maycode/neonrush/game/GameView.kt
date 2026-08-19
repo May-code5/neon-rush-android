@@ -24,29 +24,27 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     @Volatile private var surfaceReady = false
 
     private var player: Player? = null
-    private val obstacles = mutableListOf<Obstacle>()
+    private val platforms = mutableListOf<Platform>()
     private val coins = mutableListOf<Coin>()
     private val lock = Any()
 
     private var score = 0
     private var coinsCollected = 0
-    private var distance = 0f
-    private var gameSpeed = 12f
-    private var spawnTimer = 0
-    private var coinSpawnTimer = 0
-
-    private val groundPaint = Paint().apply {
-        color = 0xFF1A1A2E.toInt()
-        style = Paint.Style.FILL
-    }
-    private val linePaint = Paint().apply {
-        color = 0xFF00F5FF.toInt()
-        strokeWidth = 4f
-        alpha = 80
-    }
+    private var maxHeight = 0f
+    private var cameraY = 0f
 
     private var screenW = 0
     private var screenH = 0
+
+    // Background stars
+    private val stars = mutableListOf<Triple<Float, Float, Float>>() // x, y, size
+
+    private val bgPaint = Paint().apply { color = 0xFF07070F.toInt() }
+    private val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF88AADD.toInt() }
+    private val groundLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0x2200F5FF
+        strokeWidth = 2f
+    }
 
     init {
         holder.addCallback(this)
@@ -62,7 +60,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         screenW = width
         screenH = height
         synchronized(lock) {
-            player = Player(screenW, screenH)
+            player = Player(screenW)
+            player?.reset(screenH * 0.7f)
+            generateInitialPlatforms()
+            generateStars()
         }
         surfaceReady = true
     }
@@ -72,27 +73,51 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         stop()
     }
 
+    private fun generateStars() {
+        stars.clear()
+        repeat(60) {
+            stars.add(Triple(
+                Random.nextFloat() * screenW,
+                Random.nextFloat() * screenH * 3,
+                Random.nextFloat() * 2.5f + 0.8f
+            ))
+        }
+    }
+
+    private fun generateInitialPlatforms() {
+        platforms.clear()
+        // Starting platform
+        platforms.add(Platform(screenW / 2f - 80f, screenH * 0.75f, 160f, PlatformType.NORMAL))
+
+        var currentY = screenH * 0.75f
+        repeat(14) {
+            currentY -= Random.nextFloat() * 140f + 90f
+            val width = Random.nextFloat() * 70f + 110f
+            val x = Random.nextFloat() * (screenW - width - 80f) + 40f
+            val type = when {
+                Random.nextFloat() < 0.12f -> PlatformType.SPRING
+                Random.nextFloat() < 0.18f -> PlatformType.MOVING
+                Random.nextFloat() < 0.15f -> PlatformType.BREAKABLE
+                else -> PlatformType.NORMAL
+            }
+            platforms.add(Platform(x, currentY, width, type))
+        }
+    }
+
     fun startGame() {
         if (isRunning) return
         isRunning = true
         isPaused = false
-        thread = Thread(this, "GameThread")
+        thread = Thread(this, "NeonHopThread")
         thread?.start()
     }
 
-    fun pause() {
-        isPaused = true
-    }
-
-    fun resume() {
-        isPaused = false
-    }
+    fun pause() { isPaused = true }
+    fun resume() { isPaused = false }
 
     fun stop() {
         isRunning = false
-        try {
-            thread?.join(800)
-        } catch (_: InterruptedException) {}
+        try { thread?.join(600) } catch (_: InterruptedException) {}
         thread = null
     }
 
@@ -100,23 +125,21 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         synchronized(lock) {
             player?.let {
                 it.isAlive = true
-                it.activateShield(120)
+                it.activateShield(180)
+                it.velocityY = -14f
             }
-            obstacles.clear()
         }
     }
 
     override fun run() {
         while (isRunning) {
             if (isPaused || !surfaceReady || screenW <= 0) {
-                try { Thread.sleep(40) } catch (_: InterruptedException) {}
+                try { Thread.sleep(30) } catch (_: InterruptedException) {}
                 continue
             }
-
             update()
             drawFrame()
-
-            try { Thread.sleep(16) } catch (_: InterruptedException) {}
+            try { Thread.sleep(14) } catch (_: InterruptedException) {}
         }
     }
 
@@ -127,53 +150,79 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         synchronized(lock) {
             p.update()
 
-            distance += gameSpeed * 0.1f
-            score = (distance / 10).toInt()
-            gameSpeed = 12f + (distance / 800f).coerceAtMost(18f)
-
-            spawnTimer++
-            if (spawnTimer > (70 - gameSpeed.toInt()).coerceAtLeast(35)) {
-                obstacles.add(Obstacle(screenW, screenH, gameSpeed))
-                spawnTimer = 0
+            // Camera follows player upward
+            val targetCamera = p.y - screenH * 0.45f
+            if (targetCamera < cameraY) {
+                cameraY = targetCamera
             }
 
-            coinSpawnTimer++
-            if (coinSpawnTimer > 50) {
-                if (Random.nextFloat() > 0.4f) {
-                    coins.add(Coin(screenW, screenH, gameSpeed))
-                }
-                coinSpawnTimer = 0
-            }
+            // Score based on height
+            val heightScore = ((-cameraY) / 40f).toInt()
+            if (heightScore > score) score = heightScore
 
-            val obsIt = obstacles.iterator()
-            while (obsIt.hasNext()) {
-                val obs = obsIt.next()
-                obs.speed = gameSpeed
-                obs.update()
-                if (obs.isOffScreen()) {
-                    obsIt.remove()
-                } else if (rectsIntersect(p.getBounds(), obs.getBounds())) {
-                    if (p.hasShield) {
-                        obsIt.remove()
-                    } else {
-                        p.isAlive = false
-                        listener?.onGameOver(score, coinsCollected)
-                        return
+            // Update platforms
+            platforms.forEach { it.update(screenW) }
+
+            // Collision with platforms (only when falling)
+            if (p.velocityY > 0) {
+                val playerBounds = p.getBounds()
+                for (plat in platforms) {
+                    if (plat.broken) continue
+                    val pb = plat.getBounds()
+                    if (playerBounds.bottom >= pb.top && playerBounds.bottom <= pb.top + 28f &&
+                        playerBounds.right > pb.left + 10f && playerBounds.left < pb.right - 10f) {
+
+                        when (plat.type) {
+                            PlatformType.BREAKABLE -> {
+                                plat.broken = true
+                                p.jump(false)
+                            }
+                            PlatformType.SPRING -> p.jump(true)
+                            else -> p.jump(false)
+                        }
+                        break
                     }
                 }
             }
 
+            // Coins
             val coinIt = coins.iterator()
             while (coinIt.hasNext()) {
-                val coin = coinIt.next()
-                coin.speed = gameSpeed
-                coin.update()
-                if (coin.isOffScreen()) {
-                    coinIt.remove()
-                } else if (rectsIntersect(p.getBounds(), coin.getBounds())) {
+                val c = coinIt.next()
+                if (rectsIntersect(p.getBounds(), c.getBounds())) {
                     coinsCollected++
                     coinIt.remove()
                 }
+            }
+
+            // Spawn new platforms above
+            val highest = platforms.minOfOrNull { it.y } ?: p.y
+            if (highest > cameraY - 100) {
+                val width = Random.nextFloat() * 80f + 100f
+                val x = Random.nextFloat() * (screenW - width - 60f) + 30f
+                val y = highest - Random.nextFloat() * 130f - 100f
+                val type = when {
+                    Random.nextFloat() < 0.13f -> PlatformType.SPRING
+                    Random.nextFloat() < 0.20f -> PlatformType.MOVING
+                    Random.nextFloat() < 0.16f -> PlatformType.BREAKABLE
+                    else -> PlatformType.NORMAL
+                }
+                platforms.add(Platform(x, y, width, type))
+
+                // Chance to spawn coin
+                if (Random.nextFloat() < 0.45f) {
+                    coins.add(Coin(x + width / 2, y - 50f))
+                }
+            }
+
+            // Remove off-screen platforms
+            platforms.removeAll { it.y > cameraY + screenH + 100 }
+            coins.removeAll { it.y > cameraY + screenH + 100 }
+
+            // Death: fell below camera
+            if (p.y > cameraY + screenH + 80) {
+                p.isAlive = false
+                listener?.onGameOver(score, coinsCollected)
             }
         }
 
@@ -182,43 +231,41 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     private fun drawFrame() {
         if (!surfaceReady || screenW <= 0) return
-        val canvas: Canvas = try {
-            holder.lockCanvas() ?: return
-        } catch (_: Exception) {
-            return
-        }
+        val canvas = try { holder.lockCanvas() } catch (_: Exception) { null } ?: return
 
         try {
-            canvas.drawColor(0xFF0A0A12.toInt())
+            canvas.drawColor(0xFF07070F.toInt())
 
-            val groundY = screenH * 0.75f
-            canvas.drawRect(0f, groundY, screenW.toFloat(), screenH.toFloat(), groundPaint)
-
-            for (i in 0..8) {
-                val lx = ((i * 150f + distance * 2) % (screenW + 100)) - 50
-                canvas.drawLine(lx, groundY, lx + 80, groundY, linePaint)
+            // Stars (parallax)
+            stars.forEach { (sx, sy, size) ->
+                val drawY = (sy - cameraY * 0.3f) % (screenH + 40) - 20
+                starPaint.alpha = (140 + size * 30).toInt().coerceIn(80, 220)
+                canvas.drawCircle(sx, drawY, size, starPaint)
             }
+
+            canvas.save()
+            canvas.translate(0f, -cameraY)
 
             synchronized(lock) {
-                player?.draw(canvas)
-                obstacles.forEach { it.draw(canvas) }
+                platforms.forEach { it.draw(canvas) }
                 coins.forEach { it.draw(canvas) }
+                player?.draw(canvas)
             }
+
+            canvas.restore()
         } catch (_: Exception) {
-            // ignore draw errors
         } finally {
-            try {
-                holder.unlockCanvasAndPost(canvas)
-            } catch (_: Exception) {}
+            try { holder.unlockCanvasAndPost(canvas) } catch (_: Exception) {}
         }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.action == MotionEvent.ACTION_DOWN) {
+        if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_MOVE) {
             synchronized(lock) {
                 val p = player
                 if (p != null && p.isAlive) {
-                    p.jump()
+                    if (event.x < screenW / 2f) p.moveLeft()
+                    else p.moveRight()
                 }
             }
             return true
