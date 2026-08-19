@@ -22,32 +22,34 @@ class Player(private val screenWidth: Int) {
     var hasShield = false
     private var shieldTimer = 0
 
-    // Ritmo / pulso
     private var pulseTime = 0f
-    private val pulseSpeed = 0.18f // velocidad del latido
+    private val pulseSpeed = 0.18f
 
     private val trail = mutableListOf<Pair<Float, Float>>()
 
-    private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF00F5FF.toInt()
-        style = Paint.Style.FILL
-    }
+    // Colores de skin (se actualizan)
+    private var bodyColor = 0xFF00F5FF.toInt()
+    private var glowColor = 0x5500F5FF.toInt()
+
+    private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val corePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFFFFFFFF.toInt()
         style = Paint.Style.FILL
     }
-    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x5500F5FF.toInt()
-        style = Paint.Style.FILL
-    }
+    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val shieldPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xAAFF00E5.toInt()
         style = Paint.Style.STROKE
         strokeWidth = 7f
     }
-    private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x6600F5FF.toInt()
-        style = Paint.Style.FILL
+    private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+
+    fun setSkin(body: Int, glow: Int) {
+        bodyColor = body
+        glowColor = glow
+        bodyPaint.color = body
+        glowPaint.color = glow
+        trailPaint.color = (glow and 0x00FFFFFF) or 0x66000000
     }
 
     fun update() {
@@ -58,17 +60,10 @@ class Player(private val screenWidth: Int) {
 
         y += velocityY
         x += velocityX
-
         velocityX *= 0.90f
 
-        if (x < radius) {
-            x = radius
-            velocityX = 0f
-        }
-        if (x > screenWidth - radius) {
-            x = screenWidth - radius
-            velocityX = 0f
-        }
+        if (x < radius) { x = radius; velocityX = 0f }
+        if (x > screenWidth - radius) { x = screenWidth - radius; velocityX = 0f }
 
         trail.add(0, x to y)
         if (trail.size > 14) trail.removeAt(trail.lastIndex)
@@ -78,7 +73,6 @@ class Player(private val screenWidth: Int) {
             if (shieldTimer <= 0) hasShield = false
         }
 
-        // Avanza el pulso rítmico
         pulseTime += pulseSpeed
     }
 
@@ -86,25 +80,18 @@ class Player(private val screenWidth: Int) {
         velocityY = if (strong) springForce else jumpForce
     }
 
-    fun moveLeft() {
-        velocityX = -10.5f
-    }
-
-    fun moveRight() {
-        velocityX = 10.5f
-    }
+    fun moveLeft() { velocityX = -10.5f }
+    fun moveRight() { velocityX = 10.5f }
 
     fun activateShield(frames: Int = 180) {
         hasShield = true
         shieldTimer = frames
     }
 
-    fun getBounds(): RectF {
-        return RectF(x - radius * 0.8f, y - radius * 0.8f, x + radius * 0.8f, y + radius * 0.8f)
-    }
+    fun getBounds(): RectF =
+        RectF(x - radius * 0.8f, y - radius * 0.8f, x + radius * 0.8f, y + radius * 0.8f)
 
     fun draw(canvas: Canvas) {
-        // Factor de pulso (0.85 - 1.15)
         val pulse = 1f + 0.12f * sin(pulseTime).toFloat()
 
         trail.forEachIndexed { i, (tx, ty) ->
