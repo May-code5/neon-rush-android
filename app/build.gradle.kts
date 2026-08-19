@@ -48,8 +48,8 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.activity:activity-ktx:1.8.2")
 
-    // Google AdMob
-    implementation("com.google.android.gms:play-services-ads:22.6.0")
+    // Unity Ads
+    implementation("com.unity3d.ads:unity-ads:4.12.0")
 
     // Google Play Billing (IAP + Subscriptions)
     implementation("com.android.billingclient:billing-ktx:6.1.0")
