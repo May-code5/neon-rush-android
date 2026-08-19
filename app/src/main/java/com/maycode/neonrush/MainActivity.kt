@@ -4,9 +4,11 @@ import android.Manifest
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -83,6 +85,7 @@ class MainActivity : AppCompatActivity() {
 
         applyBackground()
         updateUI()
+        updateLobbyBall()
 
         binding.btnPlay.setOnClickListener {
             startActivity(Intent(this, GameActivity::class.java))
@@ -97,6 +100,34 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyBackground() {
         binding.root.background = personalization.getBackgroundDrawable()
+    }
+
+    private fun updateLobbyBall() {
+        val skin = SkinManager.getSelectedSkin(this)
+
+        // Glow
+        val glow = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(skin.glowColor)
+        }
+        // Body
+        val body = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(skin.color)
+        }
+        // Core
+        val core = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(0xFFFFFFFF.toInt())
+        }
+
+        // characterPreview tiene 3 hijos: glow, body, core
+        val container = binding.characterPreview
+        if (container.childCount >= 3) {
+            container.getChildAt(0).background = glow
+            container.getChildAt(1).background = body
+            container.getChildAt(2).background = core
+        }
     }
 
     private fun updateUI() {
@@ -164,6 +195,7 @@ class MainActivity : AppCompatActivity() {
                 val skin = skins[which]
                 if (SkinManager.isSkinUnlocked(this, skin)) {
                     SkinManager.setSelectedSkin(this, skin.id)
+                    updateLobbyBall()
                     Toast.makeText(this, "${skin.name} equipada", Toast.LENGTH_SHORT).show()
                 } else if (skin.requiresPremium) {
                     Toast.makeText(this, "Necesitas Premium para esta skin", Toast.LENGTH_SHORT).show()
@@ -174,6 +206,7 @@ class MainActivity : AppCompatActivity() {
                         SkinManager.unlockSkin(this, skin.id)
                         SkinManager.setSelectedSkin(this, skin.id)
                         updateUI()
+                        updateLobbyBall()
                         Toast.makeText(this, "¡${skin.name} desbloqueada y equipada!", Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(this, "No tienes suficientes monedas", Toast.LENGTH_SHORT).show()
@@ -293,6 +326,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateUI()
+        updateLobbyBall()
         personalization.startMusic()
     }
 
