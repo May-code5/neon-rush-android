@@ -35,6 +35,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private var screenW = 0
     private var screenH = 0
 
+    // Control por deslizamiento real
+    private var lastTouchX = 0f
+    private var isTouching = false
+
     private val stars = mutableListOf<Triple<Float, Float, Float>>()
     private val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF88AADD.toInt() }
 
@@ -231,23 +235,33 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.action) {
-            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
-                synchronized(lock) {
-                    val p = player
-                    if (p != null && p.isAlive) {
-                        // Corregido: lado izquierdo = izquierda, lado derecho = derecha
-                        if (event.x < screenW * 0.5f) {
+        synchronized(lock) {
+            val p = player ?: return true
+            if (!p.isAlive) return true
+
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    lastTouchX = event.x
+                    isTouching = true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (isTouching) {
+                        val deltaX = event.x - lastTouchX
+                        // Control real por deslizamiento
+                        if (deltaX < -4f) {
                             p.moveLeft()
-                        } else {
+                        } else if (deltaX > 4f) {
                             p.moveRight()
                         }
+                        lastTouchX = event.x
                     }
                 }
-                return true
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    isTouching = false
+                }
             }
         }
-        return super.onTouchEvent(event)
+        return true
     }
 
     private fun rectsIntersect(a: RectF, b: RectF): Boolean {
