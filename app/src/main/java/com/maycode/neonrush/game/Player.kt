@@ -4,62 +4,73 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 
-class Player(private val screenWidth: Int, private val screenHeight: Int) {
+class Player(private val screenWidth: Int) {
 
-    var x = screenWidth * 0.25f
-    var y = screenHeight * 0.6f
-    val width = 80f
-    val height = 80f
+    var x = screenWidth / 2f
+    var y = 0f
+    val radius = 36f
 
-    private var velocityY = 0f
-    private val gravity = 1.8f
-    private val jumpForce = -32f
-    private val groundY = screenHeight * 0.75f
+    var velocityY = 0f
+    var velocityX = 0f
+    private val gravity = 0.55f
+    private val jumpForce = -18.5f
+    private val springForce = -26f
+    private val maxFallSpeed = 22f
 
     var isAlive = true
     var hasShield = false
     private var shieldTimer = 0
 
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF00F5FF.toInt() // neon cyan
+    // Trail effect
+    private val trail = mutableListOf<Pair<Float, Float>>()
+
+    private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF00F5FF.toInt()
         style = Paint.Style.FILL
     }
-
-    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x8800F5FF.toInt()
-        style = Paint.Style.STROKE
-        strokeWidth = 12f
+    private val corePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt()
+        style = Paint.Style.FILL
     }
-
+    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0x5500F5FF.toInt()
+        style = Paint.Style.FILL
+    }
     private val shieldPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xAAFF00E5.toInt()
         style = Paint.Style.STROKE
-        strokeWidth = 8f
+        strokeWidth = 7f
     }
-
-    fun jump() {
-        if (y >= groundY - 5) { // solo desde el suelo
-            velocityY = jumpForce
-        }
+    private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0x6600F5FF.toInt()
+        style = Paint.Style.FILL
     }
 
     fun update() {
         if (!isAlive) return
 
         velocityY += gravity
+        if (velocityY > maxFallSpeed) velocityY = maxFallSpeed
+
         y += velocityY
+        x += velocityX
 
-        // Suelo
-        if (y > groundY) {
-            y = groundY
-            velocityY = 0f
+        // Soft friction on horizontal
+        velocityX *= 0.92f
+
+        // Keep inside screen horizontally
+        if (x < radius) {
+            x = radius
+            velocityX = 0f
+        }
+        if (x > screenWidth - radius) {
+            x = screenWidth - radius
+            velocityX = 0f
         }
 
-        // Techo
-        if (y < 50f) {
-            y = 50f
-            velocityY = 0f
-        }
+        // Trail
+        trail.add(0, x to y)
+        if (trail.size > 12) trail.removeAt(trail.lastIndex)
 
         if (hasShield) {
             shieldTimer--
@@ -67,34 +78,58 @@ class Player(private val screenWidth: Int, private val screenHeight: Int) {
         }
     }
 
-    fun activateShield(durationFrames: Int = 180) {
+    fun jump(strong: Boolean = false) {
+        velocityY = if (strong) springForce else jumpForce
+    }
+
+    fun moveLeft() {
+        velocityX = -9f
+    }
+
+    fun moveRight() {
+        velocityX = 9f
+    }
+
+    fun activateShield(frames: Int = 150) {
         hasShield = true
-        shieldTimer = durationFrames
+        shieldTimer = frames
     }
 
     fun getBounds(): RectF {
-        return RectF(x - width / 2, y - height / 2, x + width / 2, y + height / 2)
+        return RectF(x - radius * 0.75f, y - radius * 0.75f, x + radius * 0.75f, y + radius * 0.75f)
     }
 
     fun draw(canvas: Canvas) {
-        // Glow
-        canvas.drawCircle(x, y, width / 2 + 8, glowPaint)
+        // Trail
+        trail.forEachIndexed { i, (tx, ty) ->
+            val alpha = (180 * (1f - i / 12f)).toInt().coerceIn(0, 180)
+            trailPaint.alpha = alpha
+            canvas.drawCircle(tx, ty, radius * (0.6f - i * 0.03f), trailPaint)
+        }
 
-        // Cuerpo (círculo neón)
-        canvas.drawCircle(x, y, width / 2, paint)
+        // Outer glow
+        canvas.drawCircle(x, y, radius + 14f, glowPaint)
 
-        // Escudo
+        // Body
+        canvas.drawCircle(x, y, radius, bodyPaint)
+
+        // Core
+        canvas.drawCircle(x, y, radius * 0.38f, corePaint)
+
+        // Shield
         if (hasShield) {
-            canvas.drawCircle(x, y, width / 2 + 20, shieldPaint)
+            canvas.drawCircle(x, y, radius + 18f, shieldPaint)
         }
     }
 
-    fun reset() {
-        x = screenWidth * 0.25f
-        y = groundY
+    fun reset(startY: Float) {
+        x = screenWidth / 2f
+        y = startY
         velocityY = 0f
+        velocityX = 0f
         isAlive = true
         hasShield = false
         shieldTimer = 0
+        trail.clear()
     }
 }
