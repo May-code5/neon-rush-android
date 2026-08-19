@@ -16,8 +16,6 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
     private lateinit var prefs: SharedPreferences
     private lateinit var adManager: AdManager
 
-    private var currentScore = 0
-    private var currentCoins = 0
     private var canRevive = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,30 +31,35 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
         gameView = GameView(this)
         gameView.listener = this
 
-        // Añadir GameView detrás del HUD
         val container = binding.root as FrameLayout
-        container.addView(gameView, 0)
+        container.addView(
+            gameView,
+            0,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
 
         binding.btnRevive.setOnClickListener {
             if (canRevive) {
                 adManager.showRewarded(
                     onRewarded = {
+                        if (isFinishing) return@showRewarded
                         canRevive = false
                         binding.gameOverOverlay.visibility = View.GONE
                         gameView.revive()
                     },
                     onFailed = {
-                        // Si falla el anuncio, permitir continuar sin premio o mostrar mensaje
-                        finish()
+                        if (!isFinishing) finish()
                     }
                 )
             }
         }
 
         binding.btnMenu.setOnClickListener {
-            // Mostrar interstitial antes de volver al menú
             adManager.showInterstitial {
-                finish()
+                if (!isFinishing) finish()
             }
         }
 
@@ -64,16 +67,17 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
     }
 
     override fun onScoreChanged(score: Int, coins: Int) {
-        currentScore = score
-        currentCoins = coins
+        if (isFinishing) return
         runOnUiThread {
+            if (isFinishing) return@runOnUiThread
             binding.tvScore.text = getString(R.string.score, score)
             binding.tvGameCoins.text = "$coins 🪙"
         }
     }
 
     override fun onGameOver(finalScore: Int, coinsCollected: Int) {
-        // Guardar récord y monedas
+        if (isFinishing) return
+
         val high = prefs.getInt("high_score", 0)
         if (finalScore > high) {
             prefs.edit().putInt("high_score", finalScore).apply()
@@ -82,6 +86,7 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
         prefs.edit().putInt("coins", totalCoins).apply()
 
         runOnUiThread {
+            if (isFinishing) return@runOnUiThread
             binding.tvFinalScore.text = "Puntos: $finalScore  |  +$coinsCollected monedas"
             binding.gameOverOverlay.visibility = View.VISIBLE
             binding.btnRevive.visibility = if (canRevive) View.VISIBLE else View.GONE
@@ -90,17 +95,20 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
 
     override fun onPause() {
         super.onPause()
-        gameView.pause()
+        if (::gameView.isInitialized) gameView.pause()
     }
 
     override fun onResume() {
         super.onResume()
-        gameView.resume()
+        if (::gameView.isInitialized) gameView.resume()
     }
 
     override fun onDestroy() {
-        gameView.stop()
-        adManager.destroy()
+        if (::gameView.isInitialized) {
+            gameView.listener = null
+            gameView.stop()
+        }
+        if (::adManager.isInitialized) adManager.destroy()
         super.onDestroy()
     }
 }
