@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Neon Rush</string>
+    <string name="app_name">Neon Hop</string>
     <string name="play">JUGAR</string>
     <string name="shop">TIENDA</string>
     <string name="high_score">Récord: %1$d</string>
     <string name="coins">Monedas: %1$d</string>
-    <string name="score">Puntos: %1$d</string>
+    <string name="score">Altura: %1$d</string>
     <string name="game_over">¡GAME OVER!</string>
     <string name="revive">REVIVIR (Video)</string>
     <string name="continue_game">CONTINUAR</string>
@@ -13,5 +13,5 @@
     <string name="buy_coins">Comprar monedas</string>
     <string name="remove_ads">Eliminar anuncios</string>
     <string name="premium">Premium Mensual</string>
-    <string name="tap_to_jump">Toca para saltar</string>
+    <string name="tap_to_jump">Toca izquierda o derecha</string>
 </resources>
