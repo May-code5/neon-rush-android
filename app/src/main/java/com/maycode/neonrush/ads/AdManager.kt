@@ -14,20 +14,17 @@ import com.unity3d.services.banners.UnityBannerSize
 
 /**
  * Gestor de anuncios con Unity Ads.
- *
- * IMPORTANTE: Reemplaza GAME_ID y los Placement IDs por los tuyos
- * desde el dashboard de Unity (https://dashboard.unity3d.com)
+ * Game ID: 800359215
  */
 class AdManager(private val activity: Activity) {
 
     companion object {
-        // === REEMPLAZA ESTOS VALORES CON LOS TUYOS ===
-        private const val GAME_ID = "YOUR_UNITY_GAME_ID"          // Ejemplo: "1234567"
+        private const val GAME_ID = "800359215"
         private const val BANNER_PLACEMENT = "Banner_Android"
         private const val INTERSTITIAL_PLACEMENT = "Interstitial_Android"
         private const val REWARDED_PLACEMENT = "Rewarded_Android"
 
-        private const val TEST_MODE = true   // false cuando publiques
+        private const val TEST_MODE = true   // Cambiar a false cuando publiques
         private const val TAG = "UnityAds"
     }
 
