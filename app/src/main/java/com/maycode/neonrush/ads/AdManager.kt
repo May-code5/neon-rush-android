@@ -24,7 +24,7 @@ class AdManager(private val activity: Activity) {
         private const val INTERSTITIAL_PLACEMENT = "Interstitial_Android"
         private const val REWARDED_PLACEMENT = "Rewarded_Android"
 
-        private const val TEST_MODE = true   // Cambiar a false cuando publiques
+        private const val TEST_MODE = true
         private const val TAG = "UnityAds"
     }
 
@@ -50,7 +50,8 @@ class AdManager(private val activity: Activity) {
     }
 
     fun loadBanner(container: FrameLayout) {
-        bannerView = BannerView(activity, BANNER_PLACEMENT, UnityBannerSize.BANNER).apply {
+        val size = UnityBannerSize(320, 50)
+        bannerView = BannerView(activity, BANNER_PLACEMENT, size).apply {
             listener = object : BannerView.IListener {
                 override fun onBannerLoaded(banner: BannerView?) {
                     Log.d(TAG, "Banner loaded")
