@@ -1,11 +1,17 @@
 package com.maycode.neonrush
 
+import android.Manifest
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.maycode.neonrush.ads.AdManager
 import com.maycode.neonrush.billing.BillingManager
 import com.maycode.neonrush.databinding.ActivityMainBinding
@@ -16,6 +22,35 @@ class MainActivity : AppCompatActivity() {
     private lateinit var prefs: SharedPreferences
     private lateinit var adManager: AdManager
     private lateinit var billingManager: BillingManager
+    private lateinit var personalization: PersonalizationManager
+
+    private val pickImageLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            personalization.setCustomBackground(it)
+            applyBackground()
+            Toast.makeText(this, "Fondo personalizado aplicado", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private val pickMusicLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            personalization.setCustomMusic(it)
+            Toast.makeText(this, "Música personalizada aplicada", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions.values.any { it }
+        if (!granted) {
+            Toast.makeText(this, "Se necesita permiso para acceder a tus archivos", Toast.LENGTH_LONG).show()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,6 +58,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         prefs = getSharedPreferences("neon_rush_prefs", MODE_PRIVATE)
+        personalization = PersonalizationManager(this)
 
         adManager = AdManager(this)
         adManager.loadBanner(binding.adBannerContainer)
@@ -50,6 +86,7 @@ class MainActivity : AppCompatActivity() {
         }
         billingManager.startConnection()
 
+        applyBackground()
         updateUI()
 
         binding.btnPlay.setOnClickListener {
@@ -63,6 +100,19 @@ class MainActivity : AppCompatActivity() {
         binding.btnSkins.setOnClickListener {
             showSkinsDialog()
         }
+
+        // Long press en el título o en el personaje abre personalización
+        binding.tvTitle.setOnLongClickListener {
+            showPersonalizationDialog()
+            true
+        }
+        binding.characterPreview.setOnClickListener {
+            showPersonalizationDialog()
+        }
+    }
+
+    private fun applyBackground() {
+        binding.root.background = personalization.getBackgroundDrawable()
     }
 
     private fun updateUI() {
@@ -128,12 +178,91 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun showPersonalizationDialog() {
+        val options = arrayOf(
+            "Cambiar fondo (predefinidos)",
+            "Elegir mi propia imagen de fondo",
+            "Elegir mi propia música",
+            if (personalization.isMusicEnabled()) "Desactivar música" else "Activar música"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("🎨 Personalizar Lobby")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showPresetBackgrounds()
+                    1 -> pickCustomBackground()
+                    2 -> pickCustomMusic()
+                    3 -> {
+                        val newState = !personalization.isMusicEnabled()
+                        personalization.setMusicEnabled(newState)
+                        Toast.makeText(this, if (newState) "Música activada" else "Música desactivada", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun showPresetBackgrounds() {
+        val names = PersonalizationManager.PRESET_BACKGROUNDS.map { it.first }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Elegir fondo")
+            .setItems(names) { _, which ->
+                personalization.setPresetBackground(which)
+                applyBackground()
+                Toast.makeText(this, "Fondo cambiado", Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
+
+    private fun pickCustomBackground() {
+        if (checkAndRequestPermissions()) {
+            pickImageLauncher.launch("image/*")
+        }
+    }
+
+    private fun pickCustomMusic() {
+        if (checkAndRequestPermissions()) {
+            pickMusicLauncher.launch("audio/*")
+        }
+    }
+
+    private fun checkAndRequestPermissions(): Boolean {
+        val permissions = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
+            }
+        } else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+        }
+
+        return if (permissions.isEmpty()) {
+            true
+        } else {
+            requestPermissionLauncher.launch(permissions.toTypedArray())
+            false
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         updateUI()
+        personalization.startMusic()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        personalization.stopMusic()
     }
 
     override fun onDestroy() {
+        personalization.release()
         adManager.destroy()
         billingManager.endConnection()
         super.onDestroy()
