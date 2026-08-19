@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "com.maycode.neonrush"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.maycode.neonrush"
         minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 35
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -51,13 +51,10 @@ dependencies {
     // Unity Ads
     implementation("com.unity3d.ads:unity-ads:4.12.0")
 
-    // Google Play Billing (IAP + Subscriptions)
+    // Google Play Billing
     implementation("com.android.billingclient:billing-ktx:6.1.0")
 
-    // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-
-    // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
 
     testImplementation("junit:junit:4.13.2")
