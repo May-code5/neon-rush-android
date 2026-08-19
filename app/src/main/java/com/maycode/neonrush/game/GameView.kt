@@ -2,8 +2,8 @@ package com.maycode.neonrush.game
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -21,10 +21,12 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private var thread: Thread? = null
     @Volatile private var isRunning = false
     @Volatile private var isPaused = false
+    @Volatile private var surfaceReady = false
 
-    private lateinit var player: Player
+    private var player: Player? = null
     private val obstacles = mutableListOf<Obstacle>()
     private val coins = mutableListOf<Coin>()
+    private val lock = Any()
 
     private var score = 0
     private var coinsCollected = 0
@@ -33,7 +35,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private var spawnTimer = 0
     private var coinSpawnTimer = 0
 
-    private val bgPaint = Paint().apply { color = 0xFF0A0A12.toInt() }
     private val groundPaint = Paint().apply {
         color = 0xFF1A1A2E.toInt()
         style = Paint.Style.FILL
@@ -53,16 +54,21 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
-        // Esperamos a surfaceChanged para tener medidas reales
+        surfaceReady = true
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+        if (width <= 0 || height <= 0) return
         screenW = width
         screenH = height
-        player = Player(screenW, screenH)
+        synchronized(lock) {
+            player = Player(screenW, screenH)
+        }
+        surfaceReady = true
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
+        surfaceReady = false
         stop()
     }
 
@@ -70,7 +76,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         if (isRunning) return
         isRunning = true
         isPaused = false
-        thread = Thread(this)
+        thread = Thread(this, "GameThread")
         thread?.start()
     }
 
@@ -85,137 +91,142 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     fun stop() {
         isRunning = false
         try {
-            thread?.join(500)
+            thread?.join(800)
         } catch (_: InterruptedException) {}
+        thread = null
     }
 
     fun revive() {
-        player.isAlive = true
-        player.activateShield(120) // 2 segundos de invencibilidad
-        obstacles.clear()
-        // No reseteamos score ni monedas
+        synchronized(lock) {
+            player?.let {
+                it.isAlive = true
+                it.activateShield(120)
+            }
+            obstacles.clear()
+        }
     }
 
     override fun run() {
-        var lastTime = System.nanoTime()
         while (isRunning) {
-            if (isPaused) {
-                try { Thread.sleep(50) } catch (_: InterruptedException) {}
+            if (isPaused || !surfaceReady || screenW <= 0) {
+                try { Thread.sleep(40) } catch (_: InterruptedException) {}
                 continue
             }
 
-            val now = System.nanoTime()
-            val delta = (now - lastTime) / 1_000_000_000f
-            lastTime = now
+            update()
+            drawFrame()
 
-            update(delta)
-            draw()
-
-            // ~60 FPS
             try { Thread.sleep(16) } catch (_: InterruptedException) {}
         }
     }
 
-    private fun update(delta: Float) {
-        if (!::player.isInitialized || !player.isAlive) return
+    private fun update() {
+        val p = player ?: return
+        if (!p.isAlive) return
 
-        player.update()
+        synchronized(lock) {
+            p.update()
 
-        // Aumentar dificultad
-        distance += gameSpeed * 0.1f
-        score = (distance / 10).toInt()
-        gameSpeed = 12f + (distance / 800f).coerceAtMost(18f)
+            distance += gameSpeed * 0.1f
+            score = (distance / 10).toInt()
+            gameSpeed = 12f + (distance / 800f).coerceAtMost(18f)
 
-        // Spawn obstáculos
-        spawnTimer++
-        if (spawnTimer > (70 - gameSpeed.toInt()).coerceAtLeast(35)) {
-            obstacles.add(Obstacle(screenW, screenH, gameSpeed))
-            spawnTimer = 0
-        }
-
-        // Spawn monedas
-        coinSpawnTimer++
-        if (coinSpawnTimer > 50) {
-            if (Random.nextFloat() > 0.4f) {
-                coins.add(Coin(screenW, screenH, gameSpeed))
+            spawnTimer++
+            if (spawnTimer > (70 - gameSpeed.toInt()).coerceAtLeast(35)) {
+                obstacles.add(Obstacle(screenW, screenH, gameSpeed))
+                spawnTimer = 0
             }
-            coinSpawnTimer = 0
-        }
 
-        // Actualizar obstáculos
-        val obsIterator = obstacles.iterator()
-        while (obsIterator.hasNext()) {
-            val obs = obsIterator.next()
-            obs.speed = gameSpeed
-            obs.update()
-            if (obs.isOffScreen()) {
-                obsIterator.remove()
-            } else if (RectF_intersects(player.getBounds(), obs.getBounds())) {
-                if (player.hasShield) {
-                    // Choca pero no muere
-                    obsIterator.remove()
-                } else {
-                    player.isAlive = false
-                    listener?.onGameOver(score, coinsCollected)
-                    return
+            coinSpawnTimer++
+            if (coinSpawnTimer > 50) {
+                if (Random.nextFloat() > 0.4f) {
+                    coins.add(Coin(screenW, screenH, gameSpeed))
+                }
+                coinSpawnTimer = 0
+            }
+
+            val obsIt = obstacles.iterator()
+            while (obsIt.hasNext()) {
+                val obs = obsIt.next()
+                obs.speed = gameSpeed
+                obs.update()
+                if (obs.isOffScreen()) {
+                    obsIt.remove()
+                } else if (rectsIntersect(p.getBounds(), obs.getBounds())) {
+                    if (p.hasShield) {
+                        obsIt.remove()
+                    } else {
+                        p.isAlive = false
+                        listener?.onGameOver(score, coinsCollected)
+                        return
+                    }
                 }
             }
-        }
 
-        // Actualizar monedas
-        val coinIterator = coins.iterator()
-        while (coinIterator.hasNext()) {
-            val coin = coinIterator.next()
-            coin.speed = gameSpeed
-            coin.update()
-            if (coin.isOffScreen()) {
-                coinIterator.remove()
-            } else if (RectF_intersects(player.getBounds(), coin.getBounds())) {
-                coinsCollected++
-                coinIterator.remove()
+            val coinIt = coins.iterator()
+            while (coinIt.hasNext()) {
+                val coin = coinIt.next()
+                coin.speed = gameSpeed
+                coin.update()
+                if (coin.isOffScreen()) {
+                    coinIt.remove()
+                } else if (rectsIntersect(p.getBounds(), coin.getBounds())) {
+                    coinsCollected++
+                    coinIt.remove()
+                }
             }
         }
 
         listener?.onScoreChanged(score, coinsCollected)
     }
 
-    private fun draw() {
-        val canvas = holder.lockCanvas() ?: return
+    private fun drawFrame() {
+        if (!surfaceReady || screenW <= 0) return
+        val canvas: Canvas = try {
+            holder.lockCanvas() ?: return
+        } catch (_: Exception) {
+            return
+        }
+
         try {
-            // Fondo
             canvas.drawColor(0xFF0A0A12.toInt())
 
-            // Suelo
             val groundY = screenH * 0.75f
             canvas.drawRect(0f, groundY, screenW.toFloat(), screenH.toFloat(), groundPaint)
 
-            // Líneas de velocidad (efecto parallax simple)
             for (i in 0..8) {
                 val lx = ((i * 150f + distance * 2) % (screenW + 100)) - 50
                 canvas.drawLine(lx, groundY, lx + 80, groundY, linePaint)
             }
 
-            if (::player.isInitialized) {
-                player.draw(canvas)
+            synchronized(lock) {
+                player?.draw(canvas)
+                obstacles.forEach { it.draw(canvas) }
+                coins.forEach { it.draw(canvas) }
             }
-
-            obstacles.forEach { it.draw(canvas) }
-            coins.forEach { it.draw(canvas) }
-
+        } catch (_: Exception) {
+            // ignore draw errors
         } finally {
-            holder.unlockCanvasAndPost(canvas)
+            try {
+                holder.unlockCanvasAndPost(canvas)
+            } catch (_: Exception) {}
         }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.action == MotionEvent.ACTION_DOWN && ::player.isInitialized && player.isAlive) {
-            player.jump()
+        if (event.action == MotionEvent.ACTION_DOWN) {
+            synchronized(lock) {
+                val p = player
+                if (p != null && p.isAlive) {
+                    p.jump()
+                }
+            }
             return true
         }
         return super.onTouchEvent(event)
     }
 
-    private fun RectF_intersects(a: android.graphics.RectF, b: android.graphics.RectF): Boolean {
+    private fun rectsIntersect(a: RectF, b: RectF): Boolean {
         return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
     }
 }
