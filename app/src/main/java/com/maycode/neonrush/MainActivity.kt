@@ -59,13 +59,17 @@ class MainActivity : AppCompatActivity() {
         binding.btnShop.setOnClickListener {
             showShopDialog()
         }
+
+        binding.btnSkins.setOnClickListener {
+            showSkinsDialog()
+        }
     }
 
     private fun updateUI() {
         val highScore = prefs.getInt("high_score", 0)
         val coins = prefs.getInt("coins", 0)
-        binding.tvHighScore.text = getString(R.string.high_score, highScore)
-        binding.tvCoins.text = getString(R.string.coins, coins)
+        binding.tvHighScore.text = "Récord: $highScore"
+        binding.tvCoins.text = "$coins 🪙"
 
         if (prefs.getBoolean("ads_removed", false) || prefs.getBoolean("premium", false)) {
             binding.adBannerContainer.removeAllViews()
@@ -93,7 +97,7 @@ class MainActivity : AppCompatActivity() {
             "Premium Mensual (sin ads + bonus diario)"
         )
         AlertDialog.Builder(this)
-            .setTitle("🛒 Tienda Neon Rush")
+            .setTitle("🛒 Tienda")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> billingManager.launchPurchase("coins_1000")
@@ -102,6 +106,23 @@ class MainActivity : AppCompatActivity() {
                     3 -> billingManager.launchPurchase("remove_ads")
                     4 -> billingManager.launchPurchase("premium_monthly")
                 }
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun showSkinsDialog() {
+        val options = arrayOf(
+            "Cyan Clásico (gratis)",
+            "Magenta Neon - 500 monedas",
+            "Verde Lima - 800 monedas",
+            "Dorado Legendario - 2000 monedas",
+            "Arcoíris (Premium)"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("🎨 Skins")
+            .setItems(options) { _, which ->
+                Toast.makeText(this, "Skin seleccionada (próximamente se aplicará en juego)", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Cerrar", null)
             .show()
