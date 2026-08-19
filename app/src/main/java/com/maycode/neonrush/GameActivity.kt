@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import android.os.Bundle
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.maycode.neonrush.ads.AdManager
 import com.maycode.neonrush.databinding.ActivityGameBinding
@@ -17,6 +18,7 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
     private lateinit var adManager: AdManager
 
     private var canRevive = true
+    private val REVIVE_COST = 150
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,8 +35,7 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
 
         val container = binding.root as FrameLayout
         container.addView(
-            gameView,
-            0,
+            gameView, 0,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
@@ -42,7 +43,24 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
         )
 
         binding.btnRevive.setOnClickListener {
-            if (canRevive) {
+            if (!canRevive) return@setOnClickListener
+
+            val adsRemoved = prefs.getBoolean("ads_removed", false) || prefs.getBoolean("premium", false)
+
+            if (adsRemoved) {
+                // Usuario sin anuncios → revivir con monedas
+                val coins = prefs.getInt("coins", 0)
+                if (coins >= REVIVE_COST) {
+                    prefs.edit().putInt("coins", coins - REVIVE_COST).apply()
+                    canRevive = false
+                    binding.gameOverOverlay.visibility = View.GONE
+                    gameView.revive()
+                    Toast.makeText(this, "-$REVIVE_COST monedas", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "No tienes suficientes monedas ($REVIVE_COST)", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                // Usuario normal → video recompensado
                 adManager.showRewarded(
                     onRewarded = {
                         if (isFinishing) return@showRewarded
@@ -58,8 +76,13 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
         }
 
         binding.btnMenu.setOnClickListener {
-            adManager.showInterstitial {
-                if (!isFinishing) finish()
+            val adsRemoved = prefs.getBoolean("ads_removed", false) || prefs.getBoolean("premium", false)
+            if (adsRemoved) {
+                finish()
+            } else {
+                adManager.showInterstitial {
+                    if (!isFinishing) finish()
+                }
             }
         }
 
@@ -85,9 +108,18 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
         val totalCoins = prefs.getInt("coins", 0) + coinsCollected
         prefs.edit().putInt("coins", totalCoins).apply()
 
+        val adsRemoved = prefs.getBoolean("ads_removed", false) || prefs.getBoolean("premium", false)
+
         runOnUiThread {
             if (isFinishing) return@runOnUiThread
             binding.tvFinalScore.text = "Puntos: $finalScore  |  +$coinsCollected monedas"
+
+            if (adsRemoved) {
+                binding.btnRevive.text = "REVIVIR ($REVIVE_COST 🪙)"
+            } else {
+                binding.btnRevive.text = getString(R.string.revive)
+            }
+
             binding.gameOverOverlay.visibility = View.VISIBLE
             binding.btnRevive.visibility = if (canRevive) View.VISIBLE else View.GONE
         }
