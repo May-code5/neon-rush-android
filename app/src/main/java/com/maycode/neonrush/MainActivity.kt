@@ -24,9 +24,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var billingManager: BillingManager
     private lateinit var personalization: PersonalizationManager
 
-    private val pickImageLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
+    private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
             personalization.setCustomBackground(it)
             applyBackground()
@@ -34,9 +32,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val pickMusicLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
+    private val pickMusicLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
             personalization.setCustomMusic(it)
             Toast.makeText(this, "Música personalizada aplicada", Toast.LENGTH_SHORT).show()
@@ -46,8 +42,7 @@ class MainActivity : AppCompatActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val granted = permissions.values.any { it }
-        if (!granted) {
+        if (!permissions.values.any { it }) {
             Toast.makeText(this, "Se necesita permiso para acceder a tus archivos", Toast.LENGTH_LONG).show()
         }
     }
@@ -93,22 +88,13 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, GameActivity::class.java))
         }
 
-        binding.btnShop.setOnClickListener {
-            showShopDialog()
-        }
+        binding.btnShop.setOnClickListener { showShopDialog() }
+        binding.btnSkins.setOnClickListener { showSkinsDialog() }
 
-        binding.btnSkins.setOnClickListener {
-            showSkinsDialog()
-        }
-
-        // Long press en el título o en el personaje abre personalización
-        binding.tvTitle.setOnLongClickListener {
-            showPersonalizationDialog()
-            true
-        }
-        binding.characterPreview.setOnClickListener {
-            showPersonalizationDialog()
-        }
+        // Nuevos botones claros
+        binding.btnBackground.setOnClickListener { showBackgroundOptions() }
+        binding.btnMusic.setOnClickListener { showMusicOptions() }
+        binding.btnSettings.setOnClickListener { showSettingsDialog() }
     }
 
     private fun applyBackground() {
@@ -130,6 +116,7 @@ class MainActivity : AppCompatActivity() {
         val current = prefs.getInt("coins", 0)
         prefs.edit().putInt("coins", current + amount).apply()
         Toast.makeText(this, "+$amount monedas", Toast.LENGTH_SHORT).show()
+        updateUI()
     }
 
     private fun addGems(amount: Int) {
@@ -171,31 +158,77 @@ class MainActivity : AppCompatActivity() {
         )
         AlertDialog.Builder(this)
             .setTitle("🎨 Skins")
-            .setItems(options) { _, which ->
-                Toast.makeText(this, "Skin seleccionada (próximamente se aplicará en juego)", Toast.LENGTH_SHORT).show()
+            .setItems(options) { _, _ ->
+                Toast.makeText(this, "Skin seleccionada (próximamente se aplicará)", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Cerrar", null)
             .show()
     }
 
-    private fun showPersonalizationDialog() {
+    private fun showBackgroundOptions() {
         val options = arrayOf(
-            "Cambiar fondo (predefinidos)",
-            "Elegir mi propia imagen de fondo",
-            "Elegir mi propia música",
-            if (personalization.isMusicEnabled()) "Desactivar música" else "Activar música"
+            "Fondos predefinidos",
+            "Elegir mi propia imagen"
         )
         AlertDialog.Builder(this)
-            .setTitle("🎨 Personalizar Lobby")
+            .setTitle("Personalizar Fondo")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> showPresetBackgrounds()
                     1 -> pickCustomBackground()
-                    2 -> pickCustomMusic()
-                    3 -> {
+                }
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun showMusicOptions() {
+        val options = arrayOf(
+            "Elegir mi propia música",
+            if (personalization.isMusicEnabled()) "Desactivar música" else "Activar música"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Personalizar Música")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> pickCustomMusic()
+                    1 -> {
                         val newState = !personalization.isMusicEnabled()
                         personalization.setMusicEnabled(newState)
                         Toast.makeText(this, if (newState) "Música activada" else "Música desactivada", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun showSettingsDialog() {
+        val options = arrayOf(
+            "Restablecer récord",
+            "Restablecer monedas (solo prueba)",
+            "Acerca del juego"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("⚙️ Ajustes")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> {
+                        prefs.edit().putInt("high_score", 0).apply()
+                        updateUI()
+                        Toast.makeText(this, "Récord restablecido", Toast.LENGTH_SHORT).show()
+                    }
+                    1 -> {
+                        prefs.edit().putInt("coins", 1000).apply()
+                        updateUI()
+                        Toast.makeText(this, "Monedas de prueba añadidas", Toast.LENGTH_SHORT).show()
+                    }
+                    2 -> {
+                        AlertDialog.Builder(this)
+                            .setTitle("Neon Hop")
+                            .setMessage("Versión 1.0\nJuego hyper-casual\nHecho para Play Store")
+                            .setPositiveButton("Ok", null)
+                            .show()
                     }
                 }
             }
@@ -216,35 +249,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun pickCustomBackground() {
-        if (checkAndRequestPermissions()) {
-            pickImageLauncher.launch("image/*")
-        }
+        if (checkAndRequestPermissions()) pickImageLauncher.launch("image/*")
     }
 
     private fun pickCustomMusic() {
-        if (checkAndRequestPermissions()) {
-            pickMusicLauncher.launch("audio/*")
-        }
+        if (checkAndRequestPermissions()) pickMusicLauncher.launch("audio/*")
     }
 
     private fun checkAndRequestPermissions(): Boolean {
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED)
                 permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
-            }
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED)
                 permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
-            }
         } else {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
                 permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-            }
         }
-
-        return if (permissions.isEmpty()) {
-            true
-        } else {
+        return if (permissions.isEmpty()) true
+        else {
             requestPermissionLauncher.launch(permissions.toTypedArray())
             false
         }
