@@ -8,20 +8,19 @@ class Player(private val screenWidth: Int) {
 
     var x = screenWidth / 2f
     var y = 0f
-    val radius = 36f
+    val radius = 38f
 
     var velocityY = 0f
     var velocityX = 0f
-    private val gravity = 0.55f
-    private val jumpForce = -18.5f
-    private val springForce = -26f
-    private val maxFallSpeed = 22f
+    private val gravity = 0.48f
+    private val jumpForce = -17.8f
+    private val springForce = -25f
+    private val maxFallSpeed = 20f
 
     var isAlive = true
     var hasShield = false
     private var shieldTimer = 0
 
-    // Trail effect
     private val trail = mutableListOf<Pair<Float, Float>>()
 
     private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -55,10 +54,8 @@ class Player(private val screenWidth: Int) {
         y += velocityY
         x += velocityX
 
-        // Soft friction on horizontal
-        velocityX *= 0.92f
+        velocityX *= 0.90f
 
-        // Keep inside screen horizontally
         if (x < radius) {
             x = radius
             velocityX = 0f
@@ -68,9 +65,8 @@ class Player(private val screenWidth: Int) {
             velocityX = 0f
         }
 
-        // Trail
         trail.add(0, x to y)
-        if (trail.size > 12) trail.removeAt(trail.lastIndex)
+        if (trail.size > 14) trail.removeAt(trail.lastIndex)
 
         if (hasShield) {
             shieldTimer--
@@ -83,42 +79,35 @@ class Player(private val screenWidth: Int) {
     }
 
     fun moveLeft() {
-        velocityX = -9f
+        velocityX = -10.5f
     }
 
     fun moveRight() {
-        velocityX = 9f
+        velocityX = 10.5f
     }
 
-    fun activateShield(frames: Int = 150) {
+    fun activateShield(frames: Int = 180) {
         hasShield = true
         shieldTimer = frames
     }
 
     fun getBounds(): RectF {
-        return RectF(x - radius * 0.75f, y - radius * 0.75f, x + radius * 0.75f, y + radius * 0.75f)
+        return RectF(x - radius * 0.8f, y - radius * 0.8f, x + radius * 0.8f, y + radius * 0.8f)
     }
 
     fun draw(canvas: Canvas) {
-        // Trail
         trail.forEachIndexed { i, (tx, ty) ->
-            val alpha = (180 * (1f - i / 12f)).toInt().coerceIn(0, 180)
+            val alpha = (170 * (1f - i / 14f)).toInt().coerceIn(0, 170)
             trailPaint.alpha = alpha
-            canvas.drawCircle(tx, ty, radius * (0.6f - i * 0.03f), trailPaint)
+            canvas.drawCircle(tx, ty, radius * (0.55f - i * 0.025f), trailPaint)
         }
 
-        // Outer glow
-        canvas.drawCircle(x, y, radius + 14f, glowPaint)
-
-        // Body
+        canvas.drawCircle(x, y, radius + 16f, glowPaint)
         canvas.drawCircle(x, y, radius, bodyPaint)
+        canvas.drawCircle(x, y, radius * 0.36f, corePaint)
 
-        // Core
-        canvas.drawCircle(x, y, radius * 0.38f, corePaint)
-
-        // Shield
         if (hasShield) {
-            canvas.drawCircle(x, y, radius + 18f, shieldPaint)
+            canvas.drawCircle(x, y, radius + 20f, shieldPaint)
         }
     }
 
