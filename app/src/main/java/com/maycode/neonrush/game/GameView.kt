@@ -7,6 +7,7 @@ import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import com.maycode.neonrush.SkinManager
 import kotlin.random.Random
 
 class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback, Runnable {
@@ -35,7 +36,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private var screenW = 0
     private var screenH = 0
 
-    // Control por deslizamiento real
     private var lastTouchX = 0f
     private var isTouching = false
 
@@ -55,6 +55,9 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         screenH = height
         synchronized(lock) {
             player = Player(screenW)
+            // Aplicar skin seleccionada
+            val skin = SkinManager.getSelectedSkin(context)
+            player?.setSkin(skin.color, skin.glowColor)
             player?.reset(screenH * 0.72f)
             generateInitialPlatforms()
             generateStars()
@@ -247,18 +250,12 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                 MotionEvent.ACTION_MOVE -> {
                     if (isTouching) {
                         val deltaX = event.x - lastTouchX
-                        // Control real por deslizamiento
-                        if (deltaX < -4f) {
-                            p.moveLeft()
-                        } else if (deltaX > 4f) {
-                            p.moveRight()
-                        }
+                        if (deltaX < -4f) p.moveLeft()
+                        else if (deltaX > 4f) p.moveRight()
                         lastTouchX = event.x
                     }
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    isTouching = false
-                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> isTouching = false
             }
         }
         return true
