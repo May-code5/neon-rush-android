@@ -8,6 +8,7 @@ import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import com.maycode.neonrush.SkinManager
+import com.maycode.neonrush.SoundManager
 import kotlin.random.Random
 
 class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback, Runnable {
@@ -18,6 +19,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     }
 
     var listener: GameListener? = null
+    var soundManager: SoundManager? = null
 
     private var thread: Thread? = null
     @Volatile private var isRunning = false
@@ -55,7 +57,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         screenH = height
         synchronized(lock) {
             player = Player(screenW)
-            // Aplicar skin seleccionada
             val skin = SkinManager.getSelectedSkin(context)
             player?.setSkin(skin.color, skin.glowColor)
             player?.reset(screenH * 0.72f)
@@ -167,6 +168,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                             PlatformType.SPRING -> p.jump(true)
                             else -> p.jump(false)
                         }
+                        soundManager?.playJump()
                         break
                     }
                 }
@@ -178,6 +180,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                 if (rectsIntersect(p.getBounds(), c.getBounds())) {
                     coinsCollected++
                     coinIt.remove()
+                    soundManager?.playCoin()
                 }
             }
 
@@ -201,6 +204,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
             if (p.y > cameraY + screenH + 120) {
                 p.isAlive = false
+                soundManager?.playDeath()
                 listener?.onGameOver(score, coinsCollected)
             }
         }
