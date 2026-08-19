@@ -9,7 +9,6 @@
     <!-- Para fondos y música personalizados -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-    <!-- Compatibilidad Android 12 e inferiores -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <application
@@ -20,10 +19,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.NeonRush"
         tools:targetApi="34">
-
-        <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
 
         <activity
             android:name=".MainActivity"
