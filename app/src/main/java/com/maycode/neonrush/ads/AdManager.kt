@@ -2,136 +2,181 @@ package com.maycode.neonrush.ads
 
 import android.app.Activity
 import android.util.Log
-import android.view.ViewGroup
 import android.widget.FrameLayout
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.AdSize
-import com.google.android.gms.ads.AdView
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.MobileAds
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
-import com.google.android.gms.ads.rewarded.RewardedAd
-import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import com.unity3d.ads.IUnityAdsInitializationListener
+import com.unity3d.ads.IUnityAdsLoadListener
+import com.unity3d.ads.IUnityAdsShowListener
+import com.unity3d.ads.UnityAds
+import com.unity3d.ads.UnityAdsShowOptions
+import com.unity3d.services.banners.BannerErrorInfo
+import com.unity3d.services.banners.BannerView
+import com.unity3d.services.banners.UnityBannerSize
 
 /**
- * Gestor de anuncios AdMob.
+ * Gestor de anuncios con Unity Ads.
  *
- * IMPORTANTE: Los IDs actuales son de PRUEBA de Google.
- * Antes de publicar reemplázalos por tus IDs reales de AdMob.
+ * IMPORTANTE: Reemplaza GAME_ID y los Placement IDs por los tuyos
+ * desde el dashboard de Unity (https://dashboard.unity3d.com)
  */
 class AdManager(private val activity: Activity) {
 
     companion object {
-        // === IDs DE PRUEBA (reemplazar en producción) ===
-        private const val BANNER_ID = "ca-app-pub-3940256099942544/6300978111"
-        private const val INTERSTITIAL_ID = "ca-app-pub-3940256099942544/1033173712"
-        private const val REWARDED_ID = "ca-app-pub-3940256099942544/5224354917"
+        // === REEMPLAZA ESTOS VALORES CON LOS TUYOS ===
+        private const val GAME_ID = "YOUR_UNITY_GAME_ID"          // Ejemplo: "1234567"
+        private const val BANNER_PLACEMENT = "Banner_Android"
+        private const val INTERSTITIAL_PLACEMENT = "Interstitial_Android"
+        private const val REWARDED_PLACEMENT = "Rewarded_Android"
 
-        private const val TAG = "AdManager"
+        private const val TEST_MODE = true   // false cuando publiques
+        private const val TAG = "UnityAds"
     }
 
-    private var interstitialAd: InterstitialAd? = null
-    private var rewardedAd: RewardedAd? = null
-    private var bannerAdView: AdView? = null
+    private var bannerView: BannerView? = null
+    private var interstitialReady = false
+    private var rewardedReady = false
 
     init {
-        MobileAds.initialize(activity) {}
+        UnityAds.initialize(activity, GAME_ID, TEST_MODE, object : IUnityAdsInitializationListener {
+            override fun onInitializationComplete() {
+                Log.d(TAG, "Unity Ads initialized")
+                loadInterstitial()
+                loadRewarded()
+            }
+
+            override fun onInitializationFailed(
+                error: UnityAds.UnityAdsInitializationError?,
+                message: String?
+            ) {
+                Log.e(TAG, "Init failed: $message")
+            }
+        })
     }
 
     fun loadBanner(container: FrameLayout) {
-        bannerAdView = AdView(activity).apply {
-            setAdSize(AdSize.BANNER)
-            adUnitId = BANNER_ID
+        bannerView = BannerView(activity, BANNER_PLACEMENT, UnityBannerSize.BANNER).apply {
+            listener = object : BannerView.IListener {
+                override fun onBannerLoaded(banner: BannerView?) {
+                    Log.d(TAG, "Banner loaded")
+                }
+
+                override fun onBannerClick(banner: BannerView?) {}
+                override fun onBannerFailedToLoad(banner: BannerView?, error: BannerErrorInfo?) {
+                    Log.e(TAG, "Banner failed: ${error?.errorMessage}")
+                }
+                override fun onBannerLeftApplication(banner: BannerView?) {}
+                override fun onBannerShown(banner: BannerView?) {}
+            }
             container.addView(this)
-            loadAd(AdRequest.Builder().build())
+            load()
         }
     }
 
     fun loadInterstitial() {
-        val adRequest = AdRequest.Builder().build()
-        InterstitialAd.load(activity, INTERSTITIAL_ID, adRequest,
-            object : InterstitialAdLoadCallback() {
-                override fun onAdLoaded(ad: InterstitialAd) {
-                    interstitialAd = ad
-                    Log.d(TAG, "Interstitial loaded")
-                }
+        UnityAds.load(INTERSTITIAL_PLACEMENT, object : IUnityAdsLoadListener {
+            override fun onUnityAdsAdLoaded(placementId: String?) {
+                interstitialReady = true
+                Log.d(TAG, "Interstitial loaded")
+            }
 
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    interstitialAd = null
-                    Log.e(TAG, "Interstitial failed: ${error.message}")
-                }
-            })
+            override fun onUnityAdsFailedToLoad(
+                placementId: String?,
+                error: UnityAds.UnityAdsLoadError?,
+                message: String?
+            ) {
+                interstitialReady = false
+                Log.e(TAG, "Interstitial failed: $message")
+            }
+        })
     }
 
     fun showInterstitial(onDismissed: () -> Unit = {}) {
-        val ad = interstitialAd
-        if (ad != null) {
-            ad.fullScreenContentCallback = object : FullScreenContentCallback() {
-                override fun onAdDismissedFullScreenContent() {
-                    interstitialAd = null
-                    loadInterstitial() // precargar el siguiente
-                    onDismissed()
-                }
-
-                override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                    interstitialAd = null
-                    onDismissed()
-                }
-            }
-            ad.show(activity)
-        } else {
+        if (!interstitialReady) {
             onDismissed()
             loadInterstitial()
+            return
         }
+
+        UnityAds.show(activity, INTERSTITIAL_PLACEMENT, UnityAdsShowOptions(), object : IUnityAdsShowListener {
+            override fun onUnityAdsShowFailure(
+                placementId: String?,
+                error: UnityAds.UnityAdsShowError?,
+                message: String?
+            ) {
+                interstitialReady = false
+                onDismissed()
+                loadInterstitial()
+            }
+
+            override fun onUnityAdsShowStart(placementId: String?) {}
+            override fun onUnityAdsShowClick(placementId: String?) {}
+
+            override fun onUnityAdsShowComplete(
+                placementId: String?,
+                state: UnityAds.UnityAdsShowCompletionState?
+            ) {
+                interstitialReady = false
+                onDismissed()
+                loadInterstitial()
+            }
+        })
     }
 
     fun loadRewarded() {
-        val adRequest = AdRequest.Builder().build()
-        RewardedAd.load(activity, REWARDED_ID, adRequest,
-            object : RewardedAdLoadCallback() {
-                override fun onAdLoaded(ad: RewardedAd) {
-                    rewardedAd = ad
-                    Log.d(TAG, "Rewarded loaded")
-                }
+        UnityAds.load(REWARDED_PLACEMENT, object : IUnityAdsLoadListener {
+            override fun onUnityAdsAdLoaded(placementId: String?) {
+                rewardedReady = true
+                Log.d(TAG, "Rewarded loaded")
+            }
 
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    rewardedAd = null
-                    Log.e(TAG, "Rewarded failed: ${error.message}")
-                }
-            })
+            override fun onUnityAdsFailedToLoad(
+                placementId: String?,
+                error: UnityAds.UnityAdsLoadError?,
+                message: String?
+            ) {
+                rewardedReady = false
+                Log.e(TAG, "Rewarded failed: $message")
+            }
+        })
     }
 
     fun showRewarded(onRewarded: () -> Unit, onFailed: () -> Unit = {}) {
-        val ad = rewardedAd
-        if (ad != null) {
-            ad.fullScreenContentCallback = object : FullScreenContentCallback() {
-                override fun onAdDismissedFullScreenContent() {
-                    rewardedAd = null
-                    loadRewarded()
-                }
-
-                override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                    rewardedAd = null
-                    onFailed()
-                }
-            }
-            ad.show(activity) { rewardItem ->
-                Log.d(TAG, "User earned reward: ${rewardItem.amount}")
-                onRewarded()
-            }
-        } else {
+        if (!rewardedReady) {
             onFailed()
             loadRewarded()
+            return
         }
+
+        UnityAds.show(activity, REWARDED_PLACEMENT, UnityAdsShowOptions(), object : IUnityAdsShowListener {
+            override fun onUnityAdsShowFailure(
+                placementId: String?,
+                error: UnityAds.UnityAdsShowError?,
+                message: String?
+            ) {
+                rewardedReady = false
+                onFailed()
+                loadRewarded()
+            }
+
+            override fun onUnityAdsShowStart(placementId: String?) {}
+            override fun onUnityAdsShowClick(placementId: String?) {}
+
+            override fun onUnityAdsShowComplete(
+                placementId: String?,
+                state: UnityAds.UnityAdsShowCompletionState?
+            ) {
+                rewardedReady = false
+                if (state == UnityAds.UnityAdsShowCompletionState.COMPLETED) {
+                    onRewarded()
+                } else {
+                    onFailed()
+                }
+                loadRewarded()
+            }
+        })
     }
 
     fun destroy() {
-        bannerAdView?.destroy()
-        bannerAdView = null
-        interstitialAd = null
-        rewardedAd = null
+        bannerView?.destroy()
+        bannerView = null
     }
 }
