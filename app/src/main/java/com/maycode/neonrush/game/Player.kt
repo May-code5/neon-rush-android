@@ -3,6 +3,7 @@ package com.maycode.neonrush.game
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
+import kotlin.math.sin
 
 class Player(private val screenWidth: Int) {
 
@@ -20,6 +21,10 @@ class Player(private val screenWidth: Int) {
     var isAlive = true
     var hasShield = false
     private var shieldTimer = 0
+
+    // Ritmo / pulso
+    private var pulseTime = 0f
+    private val pulseSpeed = 0.18f // velocidad del latido
 
     private val trail = mutableListOf<Pair<Float, Float>>()
 
@@ -72,6 +77,9 @@ class Player(private val screenWidth: Int) {
             shieldTimer--
             if (shieldTimer <= 0) hasShield = false
         }
+
+        // Avanza el pulso rítmico
+        pulseTime += pulseSpeed
     }
 
     fun jump(strong: Boolean = false) {
@@ -96,18 +104,21 @@ class Player(private val screenWidth: Int) {
     }
 
     fun draw(canvas: Canvas) {
+        // Factor de pulso (0.85 - 1.15)
+        val pulse = 1f + 0.12f * sin(pulseTime).toFloat()
+
         trail.forEachIndexed { i, (tx, ty) ->
             val alpha = (170 * (1f - i / 14f)).toInt().coerceIn(0, 170)
             trailPaint.alpha = alpha
-            canvas.drawCircle(tx, ty, radius * (0.55f - i * 0.025f), trailPaint)
+            canvas.drawCircle(tx, ty, radius * (0.55f - i * 0.025f) * pulse, trailPaint)
         }
 
-        canvas.drawCircle(x, y, radius + 16f, glowPaint)
-        canvas.drawCircle(x, y, radius, bodyPaint)
-        canvas.drawCircle(x, y, radius * 0.36f, corePaint)
+        canvas.drawCircle(x, y, (radius + 16f) * pulse, glowPaint)
+        canvas.drawCircle(x, y, radius * pulse, bodyPaint)
+        canvas.drawCircle(x, y, radius * 0.36f * pulse, corePaint)
 
         if (hasShield) {
-            canvas.drawCircle(x, y, radius + 20f, shieldPaint)
+            canvas.drawCircle(x, y, (radius + 20f) * pulse, shieldPaint)
         }
     }
 
@@ -120,5 +131,6 @@ class Player(private val screenWidth: Int) {
         hasShield = false
         shieldTimer = 0
         trail.clear()
+        pulseTime = 0f
     }
 }
