@@ -36,7 +36,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private var screenH = 0
 
     private val stars = mutableListOf<Triple<Float, Float, Float>>()
-
     private val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF88AADD.toInt() }
 
     init {
@@ -44,9 +43,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         isFocusable = true
     }
 
-    override fun surfaceCreated(holder: SurfaceHolder) {
-        surfaceReady = true
-    }
+    override fun surfaceCreated(holder: SurfaceHolder) { surfaceReady = true }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         if (width <= 0 || height <= 0) return
@@ -69,22 +66,16 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private fun generateStars() {
         stars.clear()
         repeat(50) {
-            stars.add(Triple(
-                Random.nextFloat() * screenW,
-                Random.nextFloat() * screenH * 4,
-                Random.nextFloat() * 2.2f + 0.7f
-            ))
+            stars.add(Triple(Random.nextFloat() * screenW, Random.nextFloat() * screenH * 4, Random.nextFloat() * 2.2f + 0.7f))
         }
     }
 
     private fun generateInitialPlatforms() {
         platforms.clear()
-        // Plataforma inicial grande y centrada
         platforms.add(Platform(screenW / 2f - 100f, screenH * 0.78f, 200f, PlatformType.NORMAL))
 
         var currentY = screenH * 0.78f
         repeat(18) {
-            // Espacio mucho más generoso entre plataformas
             currentY -= Random.nextFloat() * 90f + 110f
             val width = Random.nextFloat() * 60f + 130f
             val x = Random.nextFloat() * (screenW - width - 60f) + 30f
@@ -144,7 +135,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         synchronized(lock) {
             p.update()
 
-            // Cámara suave
             val targetCamera = p.y - screenH * 0.5f
             if (targetCamera < cameraY) {
                 cameraY += (targetCamera - cameraY) * 0.12f
@@ -155,7 +145,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
             platforms.forEach { it.update(screenW) }
 
-            // Colisión más generosa
             if (p.velocityY > 0) {
                 val playerBounds = p.getBounds()
                 for (plat in platforms) {
@@ -167,10 +156,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                         playerBounds.left < pb.right - 8f) {
 
                         when (plat.type) {
-                            PlatformType.BREAKABLE -> {
-                                plat.broken = true
-                                p.jump(false)
-                            }
+                            PlatformType.BREAKABLE -> { plat.broken = true; p.jump(false) }
                             PlatformType.SPRING -> p.jump(true)
                             else -> p.jump(false)
                         }
@@ -179,7 +165,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                 }
             }
 
-            // Monedas
             val coinIt = coins.iterator()
             while (coinIt.hasNext()) {
                 val c = coinIt.next()
@@ -189,7 +174,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                 }
             }
 
-            // Generar nuevas plataformas (más fáciles)
             val highest = platforms.minOfOrNull { it.y } ?: p.y
             if (highest > cameraY - 80) {
                 val width = Random.nextFloat() * 50f + 130f
@@ -202,16 +186,12 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                     else -> PlatformType.NORMAL
                 }
                 platforms.add(Platform(x, y, width, type))
-
-                if (Random.nextFloat() < 0.5f) {
-                    coins.add(Coin(x + width / 2, y - 45f))
-                }
+                if (Random.nextFloat() < 0.5f) coins.add(Coin(x + width / 2, y - 45f))
             }
 
             platforms.removeAll { it.y > cameraY + screenH + 120 }
             coins.removeAll { it.y > cameraY + screenH + 120 }
 
-            // Muerte solo si cae muy abajo
             if (p.y > cameraY + screenH + 120) {
                 p.isAlive = false
                 listener?.onGameOver(score, coinsCollected)
@@ -251,15 +231,21 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_MOVE) {
-            synchronized(lock) {
-                val p = player
-                if (p != null && p.isAlive) {
-                    if (event.x < screenW / 2f) p.moveLeft()
-                    else p.moveRight()
+        when (event.action) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                synchronized(lock) {
+                    val p = player
+                    if (p != null && p.isAlive) {
+                        // Corregido: lado izquierdo = izquierda, lado derecho = derecha
+                        if (event.x < screenW * 0.5f) {
+                            p.moveLeft()
+                        } else {
+                            p.moveRight()
+                        }
+                    }
                 }
+                return true
             }
-            return true
         }
         return super.onTouchEvent(event)
     }
