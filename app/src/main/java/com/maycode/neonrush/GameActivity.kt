@@ -16,6 +16,7 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
     private lateinit var gameView: GameView
     private lateinit var prefs: SharedPreferences
     private lateinit var adManager: AdManager
+    private lateinit var personalization: PersonalizationManager
 
     private var canRevive = true
     private val REVIVE_COST = 150
@@ -26,6 +27,7 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
         setContentView(binding.root)
 
         prefs = getSharedPreferences("neon_rush_prefs", MODE_PRIVATE)
+        personalization = PersonalizationManager(this)
         adManager = AdManager(this)
         adManager.loadInterstitial()
         adManager.loadRewarded()
@@ -48,7 +50,6 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
             val adsRemoved = prefs.getBoolean("ads_removed", false) || prefs.getBoolean("premium", false)
 
             if (adsRemoved) {
-                // Usuario sin anuncios → revivir con monedas
                 val coins = prefs.getInt("coins", 0)
                 if (coins >= REVIVE_COST) {
                     prefs.edit().putInt("coins", coins - REVIVE_COST).apply()
@@ -60,7 +61,6 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
                     Toast.makeText(this, "No tienes suficientes monedas ($REVIVE_COST)", Toast.LENGTH_SHORT).show()
                 }
             } else {
-                // Usuario normal → video recompensado
                 adManager.showRewarded(
                     onRewarded = {
                         if (isFinishing) return@showRewarded
@@ -128,11 +128,13 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
     override fun onPause() {
         super.onPause()
         if (::gameView.isInitialized) gameView.pause()
+        personalization.stopMusic()
     }
 
     override fun onResume() {
         super.onResume()
         if (::gameView.isInitialized) gameView.resume()
+        personalization.startMusic() // Música también durante la partida
     }
 
     override fun onDestroy() {
@@ -140,6 +142,7 @@ class GameActivity : AppCompatActivity(), GameView.GameListener {
             gameView.listener = null
             gameView.stop()
         }
+        personalization.release()
         if (::adManager.isInitialized) adManager.destroy()
         super.onDestroy()
     }
