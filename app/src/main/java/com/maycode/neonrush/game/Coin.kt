@@ -3,40 +3,31 @@ package com.maycode.neonrush.game
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
-import kotlin.random.Random
 
-class Coin(
-    private val screenWidth: Int,
-    private val screenHeight: Int,
-    var speed: Float
-) {
-    var x = screenWidth + 50f
-    var y = screenHeight * (0.3f + Random.nextFloat() * 0.4f)
-    val radius = 25f
+class Coin(var x: Float, var y: Float) {
+
+    private val radius = 18f
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFFFFF00.toInt() // neon yellow
+        color = 0xFFFFD700.toInt()
         style = Paint.Style.FILL
     }
-
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x88FFFF00.toInt()
-        style = Paint.Style.STROKE
-        strokeWidth = 10f
+        color = 0x66FFD700.toInt()
+        style = Paint.Style.FILL
     }
-
-    fun update() {
-        x -= speed
+    private val corePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFF0.toInt()
+        style = Paint.Style.FILL
     }
-
-    fun isOffScreen(): Boolean = x + radius < 0
 
     fun getBounds(): RectF {
         return RectF(x - radius, y - radius, x + radius, y + radius)
     }
 
     fun draw(canvas: Canvas) {
-        canvas.drawCircle(x, y, radius + 6, glowPaint)
+        canvas.drawCircle(x, y, radius + 8f, glowPaint)
         canvas.drawCircle(x, y, radius, paint)
+        canvas.drawCircle(x, y, radius * 0.4f, corePaint)
     }
 }
