@@ -14,9 +14,11 @@ class Player(private val screenWidth: Int) {
     var velocityY = 0f
     var velocityX = 0f
     private val gravity = 0.48f
-    private val jumpForce = -17.8f
-    private val springForce = -25f
+    private val baseJumpForce = -17.8f
+    private val baseSpringForce = -25f
     private val maxFallSpeed = 20f
+
+    private var jumpMultiplier = 1.0f
 
     var isAlive = true
     var hasShield = false
@@ -27,7 +29,6 @@ class Player(private val screenWidth: Int) {
 
     private val trail = mutableListOf<Pair<Float, Float>>()
 
-    // Colores de skin (se actualizan)
     private var bodyColor = 0xFF00F5FF.toInt()
     private var glowColor = 0x5500F5FF.toInt()
 
@@ -44,9 +45,10 @@ class Player(private val screenWidth: Int) {
     }
     private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
 
-    fun setSkin(body: Int, glow: Int) {
+    fun setSkin(body: Int, glow: Int, jumpMult: Float = 1.0f) {
         bodyColor = body
         glowColor = glow
+        jumpMultiplier = jumpMult
         bodyPaint.color = body
         glowPaint.color = glow
         trailPaint.color = (glow and 0x00FFFFFF) or 0x66000000
@@ -77,7 +79,8 @@ class Player(private val screenWidth: Int) {
     }
 
     fun jump(strong: Boolean = false) {
-        velocityY = if (strong) springForce else jumpForce
+        val force = if (strong) baseSpringForce else baseJumpForce
+        velocityY = force * jumpMultiplier
     }
 
     fun moveLeft() { velocityX = -10.5f }
