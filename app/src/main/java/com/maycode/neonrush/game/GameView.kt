@@ -58,7 +58,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         synchronized(lock) {
             player = Player(screenW)
             val skin = SkinManager.getSelectedSkin(context)
-            player?.setSkin(skin.color, skin.glowColor)
+            player?.setSkin(skin.color, skin.glowColor, skin.jumpMultiplier)
             player?.reset(screenH * 0.72f)
             generateInitialPlatforms()
             generateStars()
