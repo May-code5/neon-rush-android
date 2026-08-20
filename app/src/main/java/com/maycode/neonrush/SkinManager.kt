@@ -8,18 +8,19 @@ data class Skin(
     val name: String,
     val color: Int,
     val glowColor: Int,
-    val price: Int,          // 0 = gratis
+    val price: Int,
+    val jumpMultiplier: Float,   // 1.0 = normal, >1 = salta más alto
     val requiresPremium: Boolean = false
 )
 
 object SkinManager {
 
     val SKINS = listOf(
-        Skin("cyan", "Cyan Clásico", 0xFF00F5FF.toInt(), 0x5500F5FF.toInt(), 0),
-        Skin("magenta", "Magenta Neon", 0xFFFF00E5.toInt(), 0x55FF00E5.toInt(), 500),
-        Skin("lime", "Verde Lima", 0xFF39FF14.toInt(), 0x5539FF14.toInt(), 800),
-        Skin("gold", "Dorado Legendario", 0xFFFFD700.toInt(), 0x55FFD700.toInt(), 2000),
-        Skin("rainbow", "Arcoíris", 0xFFFF6B35.toInt(), 0x55FF6B35.toInt(), 0, requiresPremium = true)
+        Skin("cyan", "Cyan Clásico", 0xFF00F5FF.toInt(), 0x5500F5FF.toInt(), 0, 1.00f),
+        Skin("magenta", "Magenta Neon", 0xFFFF00E5.toInt(), 0x55FF00E5.toInt(), 500, 1.06f),
+        Skin("lime", "Verde Lima", 0xFF39FF14.toInt(), 0x5539FF14.toInt(), 800, 1.10f),
+        Skin("gold", "Dorado Legendario", 0xFFFFD700.toInt(), 0x55FFD700.toInt(), 2000, 1.16f),
+        Skin("rainbow", "Arcoíris", 0xFFFF6B35.toInt(), 0x55FF6B35.toInt(), 0, 1.22f, requiresPremium = true)
     )
 
     private fun prefs(context: Context): SharedPreferences =
